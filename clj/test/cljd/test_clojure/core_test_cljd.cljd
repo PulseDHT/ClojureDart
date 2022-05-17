@@ -11,6 +11,7 @@
 
 (ns cljd.test-clojure.core-test-cljd
   (:require ["dart:async" :as async]
+            ["dart:developer" :as dev]
             [cljd.string :as str])
   (:use [cljd.test :only [deftest is testing are]]))
 
@@ -323,3 +324,76 @@
                          (toString [inner-this]
                            (str (.hashCode outer-this)))))))]
     (is (= (str "+" (.hashCode x)) (.toString x)))))
+
+(deftest super-pseudo-type
+  (let [x (reify Object
+            (hashCode [_] 42)
+            (toString [self] (str (.hashCode ^super self))))]
+    (is (= (str (dart:core/identityHashCode x)) (str x)))
+    (is (= 42 (.hashCode x)))))
+
+
+(deftest closing-over-super
+  (let [v (volatile! nil)
+        x (reify Object
+            (hashCode [this]
+              (vreset! v #(.hashCode ^super this))
+              42))
+        y (reify Object
+            (hashCode [that]
+              (vreset! v
+                (reify Object
+                  (hashCode [this]
+                    (bit-xor (.hashCode ^super that) (.hashCode ^super this)))))
+              43))]
+    (is (= 42 (.hashCode x)))
+    (is (= (dart:core/identityHashCode x) (@v)))
+    (is (= 43 (.hashCode y)))
+    (is (= (bit-xor (dart:core/identityHashCode y)
+             (dart:core/identityHashCode @v))
+          (.hashCode @v)))))
+
+(deftype InferredAwait [^#/(Future int) prop]
+  (coucou [this] (await prop)))
+
+(deftype NotInferredAwait [^#/(Future int) prop]
+  (^:async coucou [this] (await prop)))
+
+(definterface ConcreteInterface (^#/(Future int) mymethod []))
+
+(deftype Concrete []
+  ConcreteInterface
+  (mymethod [this] (await (Future/value 42))))
+
+(deftest await-inference
+  (let [num (.value #/(Future int) 42)]
+    (is (= (await (.coucou (InferredAwait. num)))
+          (await (.coucou (NotInferredAwait. num)))))
+    (is (= (inc (await (.coucou (InferredAwait. num))))
+          (await ((fn [& more] (inc (await (first more)))) num))
+          43))
+    (is (= 42 (.hashCode (reify Object
+                           (hashCode [this] ((fn ([] 42) ([one] (await one)))))))))
+    (is (= 42 (let [x (await (.mymethod (Concrete.)))] x)))))
+
+;; this case happened with dev.ServiceExtensionResponse/result
+(deftest infer-named-constructor-when-same-name-prop-exists
+  (let [ser (dev.ServiceExtensionResponse/result "coucou")]
+    (is (dart/is? ser dev/ServiceExtensionResponse))
+    (is (dart/is? (.-result ser) String?))))
+
+(definterface INullableFunctionBug
+  (^String text [^^{:params-types (void)} Function? onPressed]))
+
+(deftype NullableFunctionBug []
+  INullableFunctionBug
+  (text [this ^^{:params-types (void)} Function? onPressed]
+    (if-not (nil? onPressed)
+      (do (onPressed)
+          "hooo")
+      "Heeyyy")))
+
+(deftest nullable-function-bug
+  (let [x (NullableFunctionBug.)]
+    (is (= "Heeyyy" (.text x nil)))
+    (is (= "hooo" (.text x (fn [] "dd" nil))))))

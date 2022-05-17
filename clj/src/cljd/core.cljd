@@ -366,14 +366,16 @@
 
 (defmacro deftype [& args]
   (let [[class-name fields & args] args
-        [opts specs] (roll-leading-opts args)]
-    `(do
-       (~'deftype* ~class-name ~fields ~opts ~@specs)
-       ~(when-not (or (:type-only opts) (:abstract (meta class-name)))
-          `(defn
-             ~(symbol (str "->" class-name))
-             [~@fields]
-             (new ~(vary-meta class-name dissoc :type-params) ~@fields))))))
+        [opts specs] (roll-leading-opts args)
+        deftype-form (list* 'deftype* class-name fields opts specs)]
+    (if (or (:type-only opts) (:abstract (meta class-name)))
+      deftype-form
+      `(do
+         ~deftype-form
+         (defn
+           ~(symbol (str "->" class-name))
+           [~@fields]
+           (new ~(vary-meta class-name dissoc :type-params) ~@fields))))))
 
 (defmacro definterface [iface & meths]
   `(deftype ~(vary-meta iface assoc :abstract true) []
@@ -1965,7 +1967,7 @@
   IReset
   (-reset! [this new-value] (set-and-validate-atom-state! this new-value)))
 
-(defn reset! [^Atom atom new-value]
+(defn reset! [atom new-value]
   (-reset! atom new-value))
 
 (defn ^bool compare-and-set!
@@ -2060,10 +2062,10 @@
   (apply f current-value-of-atom args). Note that f may be called
   multiple times, and thus should be free of side effects.  Returns
   the value that was swapped in."
-  ([^Atom a f] (-swap! a f))
-  ([^Atom a f x] (-swap! a f x))
-  ([^Atom a f x y] (-swap! a f x y))
-  ([^Atom a f x y & more] (-swap! a f x y more)))
+  ([a f] (-swap! a f))
+  ([a f x] (-swap! a f x))
+  ([a f x y] (-swap! a f x y))
+  ([a f x y & more] (-swap! a f x y more)))
 
 (defn reset-vals!
   "Sets the value of atom to newval. Returns [old new], the value of the
@@ -4529,7 +4531,7 @@
               ;; TODO not=
               (not (= k' k))
               (let [net-size (dec (u32x2-bit-count bitmap-hi bitmap-lo))
-                    gross-size (inc (bit-or 7 (dec net-size)))
+                    gross-size (bit-and -8 (+ 7 net-size))
                     shift' (+ 5 ^int shift)
                     n' (bit-and (u32-bit-shift-right (hash k') shift') 31)
                     bit' (u32-bit-shift-left 1 n')
@@ -4590,7 +4592,7 @@
                 (let [k (aget (.-arr child') 0)
                       v (aget (.-arr child') 1)
                       net-size (inc (u32x2-bit-count bitmap-hi bitmap-lo))
-                      gross-size (inc (bit-or 7 (dec net-size)))
+                      gross-size (bit-and -8 (+ 7 net-size))
                       from-arr arr]
                   (when (< (.-length arr) net-size)
                     (set! arr (aresize arr idx gross-size nil)))
@@ -4608,7 +4610,7 @@
           ; the right kv pair
           (= k (aget arr idx))
           (let [net-size (- (u32x2-bit-count bitmap-hi bitmap-lo) 2)
-                gross-size (inc (bit-or 7 (dec net-size)))
+                gross-size (bit-and -8 (+ 7 net-size))
                 from-arr arr]
             (when (< gross-size (.-length arr))
               (set! arr (aresize arr idx gross-size nil)))
@@ -4898,7 +4900,7 @@
     (let [bitmap-hi (.-bitmap_hi root)
           bitmap-lo (.-bitmap_lo root)
           net-size (u32x2-bit-count bitmap-hi bitmap-lo)
-          gross-size (inc (bit-or 7 (dec net-size)))]
+          gross-size (bit-and -8 (+ 7 net-size))]
       (TransientHashMap. true (BitmapNode. (.-cnt root) (bit-and bitmap-hi bitmap-lo) (bit-or bitmap-hi bitmap-lo) (aresize (.-arr root) net-size gross-size nil))))))
 
 (def ^PersistentHashMap -EMPTY-MAP
@@ -7149,3 +7151,10 @@
              nil
              (reduce dissoc (into {} ~m) ~(into [] (map keyword) fields))
              -1)))))
+
+(defmacro extend-protocol [protocol & types+impls]
+  (when-some [[type & more] (seq types+impls)]
+    (let [[impls types+impls] (split-with seq? more)]
+      `(do
+         (extend-type ~type ~protocol ~@impls)
+         (extend-protocol ~protocol ~@types+impls)))))

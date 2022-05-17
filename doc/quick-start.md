@@ -27,7 +27,7 @@ cat << EOF > deps.edn
         tensegritics/clojuredart
         {:git/url "git@github.com:tensegritics/ClojureDart.git"
          ; or  "https://github.com/tensegritics/ClojureDart.git"
-         :sha "690b542350daa133f6650541692e06afa0b8434f"}}}
+         :sha "19ba3c6280daf1898d27e07994a1911ad8f51f8d"}}}
 EOF
 ```
 
@@ -74,7 +74,7 @@ Compiled Dart files are found under `lib/cljd-out`; to execute the program, just
 dart run
 ```
 
-By doing so you have ran your program on the Dart VM. To get an actual executable, enter:
+By doing so you have run your program on the Dart VM. To get an actual executable, enter:
 
 ``` shell
 dart compile exe -o helloworld bin/helloworld.dart

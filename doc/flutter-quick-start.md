@@ -31,7 +31,7 @@ cat << EOF > deps.edn
  :deps {org.clojure/clojure {:mvn/version "1.10.1"}
         tensegritics/clojuredart
         {:git/url "git@github.com:tensegritics/ClojureDart.git"
-         :sha "690b542350daa133f6650541692e06afa0b8434f"}}}
+         :sha "19ba3c6280daf1898d27e07994a1911ad8f51f8d"}}}
 EOF
 ```
 
@@ -43,7 +43,7 @@ cat << EOF > deps.edn
  :deps {org.clojure/clojure {:mvn/version "1.10.1"}
         tensegritics/clojuredart
         {:git/url "https://github.com/tensegritics/ClojureDart.git"
-         :sha "690b542350daa133f6650541692e06afa0b8434f"}}}
+         :sha "19ba3c6280daf1898d27e07994a1911ad8f51f8d"}}}
 EOF
 ```
 
@@ -93,6 +93,24 @@ open -a Simulator
 ```
 
 Android:
+
+> :bulb: We recommand you to use Genymotion plugin for Android Studio, since its lighter than the AS native one.
+
+Please follow [those guidelines](https://docs.genymotion.com/desktop/Get_started/Requirements/) to install and setup Genymotion.
+
+
+* Configure the SDK **within Genymotion** (`Genymotion > Preferences > ADB > Use custom Android SDK tools`) then use the path `/$HOME/Android/sdk` (default location after installing Android Studio)
+
+    * Create a new device within Genymotion
+
+* In **Android Studio**
+
+    * `Select Tools > SDK Manager > Plugins > Genymotion`, and restart Android Studio
+    * Then, select `Files > Settings`
+    * On the sidebar, select `Tools > Genymotion plugin`
+    * Select the path to your Genymotion folder
+
+* within your **flutter project**, run `flutter devices`: Genymotion should appear among connected devices. (make sure your genymotion device is still on)
 
 ## 8. Start the ClojureDart watcher
 
