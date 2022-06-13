@@ -246,8 +246,7 @@
         entry-point (case bin
                       "flutter" (java.io.File. libdir "main.dart")
                       "dart"
-                      (->  dir (java.io.File. "bin")
-                        (java.io.File. (str project_name ".dart"))))
+                      (java.io.File. "bin" (str project_name ".dart")))
         lib (compiler/relativize-lib (.getPath entry-point) (compiler/ns-to-lib main-ns))]
     (println "Initializing" (bright project-name) "as a" (bright bin) "project!")
     (or
@@ -257,8 +256,8 @@
           (concat bin-opts [(System/getProperty "user.dir")]))
         "dart"
         (apply exec bin "create" "--force" (concat bin-opts [(System/getProperty "user.dir")])))
-      (spit (java.io.File. (System/getProperty "user.dir") "cljd.edn") (pr-str {:main main-ns :bin bin}))
-      (spit entry-point (str "export " (with-out-str (compiler/write-string-literal lib)) " show main;\n"))
+      (spit (java.io.File. "cljd.edn") (pr-str {:main main-ns :bin bin}))
+      (spit entry-point (str "export " (compiler/with-dart-str (compiler/write-string-literal lib)) " show main;\n"))
       (println "👍" (green "All setup!") "Let's write some cljd in" main-ns))))
 
 (defn exit [status msg]
@@ -353,7 +352,7 @@
               :doc "Like watch but hot reload the application in the simulator or device. All options are passed to flutter run."}})
 
 (defn -main [& args]
-  (let [f (java.io.File. (System/getProperty "user.dir") "cljd.edn")
+  (let [f (java.io.File. "cljd.edn")
         f-exists (.exists f)
         config (if f-exists
                  (with-open [rdr (-> f io/reader java.io.PushbackReader.)]
@@ -362,7 +361,7 @@
     (binding [*ansi* (and (System/console) (get (System/getenv) "TERM"))
               *config* config
               compiler/*lib-path*
-              (str (.getPath (java.io.File. (System/getProperty "user.dir") "lib")) "/")]
+              (str (.getPath (java.io.File. "lib")) "/")]
       (let [[options cmd cmd-opts & args] (parse-args commands args)]
         (print-missing-config-warning f-exists cmd)
         (case cmd

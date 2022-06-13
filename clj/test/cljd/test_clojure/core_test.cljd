@@ -1170,9 +1170,8 @@
   (amethod [t]))
 
 (deftest test-cljs-1451
-  (testing "caca"
-    (is (= "foobar"
-          (amethod (reify IFooBar (amethod [_] "foobar")))))))
+  (is (= "foobar"
+        (amethod (reify IFooBar (amethod [_] "foobar"))))))
 
 (deftest test-cljs-1569
   (is (= (meta (with-meta (seq [1 2 3]) {:a 1})) {:a 1})))
@@ -1605,6 +1604,12 @@
 ;; TODO
 #_(deftest test-cljs-2552
     (is (boolean? (tap> nil))))
+
+(deftest test-boolean?
+  (is (boolean? true))
+  (is (boolean? false))
+  (is (not (boolean? nil)))
+  (is (not (boolean? 10))))
 
 ;; TODO
 #_(deftest test-cljs-2693

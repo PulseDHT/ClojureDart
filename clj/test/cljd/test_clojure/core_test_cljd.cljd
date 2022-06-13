@@ -12,6 +12,7 @@
 (ns cljd.test-clojure.core-test-cljd
   (:require ["dart:async" :as async]
             ["dart:developer" :as dev]
+            ["dart:io" :as io]
             [cljd.string :as str])
   (:use [cljd.test :only [deftest is testing are]]))
 
@@ -255,14 +256,14 @@
           (subvec 1 3)))))
 
 (deftest testing-dart-map-comply-with-iseqable-ilookup
-  (let [dart-map (Map/fromEntries (. (seq {:a :b }) #/(cast MapEntry)))]
+  (let [dart-map (Map/fromEntries (. ^List (seq {:a :b }) #/(cast MapEntry)))]
     (is (= :b (get dart-map :a)))
     (is (true? (contains? dart-map :a)))
     (is (false? (contains? dart-map :e)))
     (is (= {:a :b} (into {} dart-map)))))
 
 (deftest testing-dart-mapentry-comply-with-imapentry-iidexed
-  (let [dart-map (Map/fromEntries (. (seq {:a :b }) #/(cast MapEntry)))
+  (let [dart-map (Map/fromEntries (. ^List (seq {:a :b }) #/(cast MapEntry)))
         me (first dart-map)]
     (is (= :a (nth me 0)))
     (is (= :b (nth me 1)))
@@ -285,7 +286,7 @@
     (is (true? (dart/is? (find (. [0 1 2] #/(cast int)) 1) #/(cljd.core/PersistentMapEntry int int))))
 
     (is (false? (dart/is? (find (subvec [0 1 2] 1) 1) #/(cljd.core/PersistentMapEntry int int))))
-    (is (true? (dart/is? (find (. (subvec [0 1 2] 1) #/(cast int)) 1) #/(cljd.core/PersistentMapEntry int int))))
+    (is (true? (dart/is? (find (. ^List (subvec [0 1 2] 1) #/(cast int)) 1) #/(cljd.core/PersistentMapEntry int int))))
 
     (is (false? (dart/is? (find {"a" "b"} "a") #/(cljd.core/PersistentMapEntry String String))))
     (is (true? (dart/is? (find (. {"a" "b"} #/(cast String String)) "a") #/(cljd.core/PersistentMapEntry String String))))))
@@ -397,3 +398,62 @@
   (let [x (NullableFunctionBug.)]
     (is (= "Heeyyy" (.text x nil)))
     (is (= "hooo" (.text x (fn [] "dd" nil))))))
+
+(deftest CLJD-74-assoc!-subnode
+  (let [m '{tiltontec.util.base/*trdeep* 5 tiltontec.cell.base/*call-stack* 7}
+        m' (persistent! (assoc! (transient m) 'tiltontec.util.base/*trdeep* 50))]
+    (is (= (count m) (count m')))))
+
+(deftest CLJD-77-first-on-subvec
+  (let [v (into [] (range 100))]
+    (is (= 1 (first (subvec v 1))))))
+
+(deftest CLJD-76-case-on-symbols
+  (is (= true (case 'x x true false)))
+  (is (= false (case 'y x true false))))
+
+(definterface ICastNullable
+  (^String text [^#/(List? String) actions]))
+
+(deftype CastNullable [useless]
+  ICastNullable
+  (text [this actions]
+    (if-not (nil? actions)
+      (.-last actions)
+      "worked")))
+
+(deftest cast-nullable-to-non-nullable-for-castable-collections
+  (let [x (CastNullable. nil)]
+    (is (= "clojuredart" (.text x (cond-> ["coucou"]
+                                    true (conj "clojuredart")))))
+    (is (= "worked" (.text x nil)))
+    (is (= "worked" (.text x ^List? (identity nil))))))
+
+(deftest no-core-private-lib-exposed-by-compilation
+  ; it's a compile time "test": if it compiles it's ok
+  (let [s (fn []
+            (let [server (await (.bind io/HttpServer (.-anyIPv6 io/InternetAddress) 8080))]
+              (.forEach server (fn [^io/HttpRequest r]
+                                 (.close (.-response r))
+                                 nil))))]
+    ;; here we only test compilation works
+    (is (some? s))))
+
+(deftest CLJD-101-cast-them-all
+  (let [path ["first" "second"]]
+    (is (some?
+          (Uri.
+            :path (when (string? path) path)
+            :pathSegments (when (coll? path) path))))))
+
+(deftest dart-apply
+  (is (false?
+        (Function/apply dart:core/identical ["hello" "world"] {}))))
+
+(deftest CLJD-96-destructure-test
+  (let [sample-destructure-test (fn [& {:keys [foo]}] foo)]
+    (testing "Destructuring in many ways"
+      (is (nil? (sample-destructure-test)))
+      (is (zero? (sample-destructure-test :foo 0)))
+      (is (zero? (sample-destructure-test :foo 1 :foo 0)))
+      (is (nil? (sample-destructure-test :bar 1))))))
